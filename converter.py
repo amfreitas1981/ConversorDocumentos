@@ -18,10 +18,12 @@ class DocumentConverter:
             '.docx': 'docx',
             '.odt': 'odt',
             '.rtf': 'rtf',
-            '.txt': 'markdown',  # Resolvido erro de formato 'plain'
+            '.txt': 'markdown',
             '.html': 'html',
             '.htm': 'html',
-            '.pdf': 'pdf'
+            '.pdf': 'pdf',
+            '.pptx': 'pptx',  # Suporte a PowerPoint
+            '.ppt': 'pptx'  # Pandoc utiliza o motor pptx para ler .ppt
         }
         self.sheet_formats = ['.xlsx', '.xls', '.csv', '.ods']
 
@@ -31,7 +33,7 @@ class DocumentConverter:
         in_ext = in_path.suffix.lower()
         out_ext = out_path.suffix.lower()
 
-        # Define a pasta de mídia dentro da pasta de saída para garantir visibilidade
+        # Define a pasta de mídia dentro da pasta de saída
         out_path.parent.mkdir(parents=True, exist_ok=True)
         media_subdir_name = "media"
         media_abs_path = out_path.parent / media_subdir_name
@@ -44,23 +46,18 @@ class DocumentConverter:
 
             # 2. PDF -> Markdown (Especializado para Imagens)
             elif in_ext == '.pdf' and out_ext == '.md':
-                # Extrai texto e imagens
                 md_text = pymupdf4llm.to_markdown(
                     input_file,
                     write_images=True,
                     image_path=str(media_abs_path),
                     image_format="png"
                 )
-
-                # Ajuste de links: Garante que o MD aponte para 'media/imagem.png'
-                # e não para o caminho absoluto do seu computador
                 md_text = md_text.replace(str(media_abs_path), media_subdir_name)
-
                 with open(output_file, 'w', encoding='utf-8') as f:
                     f.write(md_text)
                 print(f"✅ PDF -> MD (com imagens): {out_path.name}")
 
-            # 3. Documentos Gerais (Pandoc)
+            # 3. Documentos e Apresentações (Pandoc)
             else:
                 self._run_pandoc(input_file, output_file, in_ext, out_ext, media_abs_path)
         except Exception as e:
@@ -84,13 +81,16 @@ class DocumentConverter:
 
     def _run_pandoc(self, input_file, output_file, in_ext, out_ext, media_dir):
         extra_args = []
+
+        # Configurações para PDF
         if out_ext == '.pdf':
             extra_args.append('--pdf-engine=weasyprint')
 
-        # Para DOCX/ODT, extrai imagens para a subpasta de mídia
-        if out_ext == '.md' and in_ext in ['.docx', '.odt', '.html']:
+        # Extração de mídia para documentos ricos (Word/PPTX) quando convertidos para MD
+        if out_ext == '.md' and in_ext in ['.docx', '.odt', '.html', '.pptx', '.ppt']:
             extra_args.append(f'--extract-media={media_dir.parent}')
 
+        # Execução da conversão via Pandoc
         pypandoc.convert_file(
             input_file,
             self.doc_formats.get(out_ext, 'markdown'),
@@ -112,18 +112,17 @@ class ConversionHandler(FileSystemEventHandler):
 
     def process_file(self, file_path):
         input_path = Path(file_path)
-        # Ignora arquivos temporários (ex: ~$doc.docx no Windows)
         if input_path.name.startswith(('.', '~', '$')): return
 
-        time.sleep(1.5)  # Aguarda liberação do arquivo pelo SO
+        time.sleep(1.5)
         in_ext = input_path.suffix.lower()
 
-        # Se entrar um Markdown, gera PDF e DOCX
+        # Se for Markdown, gera o "Pacote Executivo" (.pdf, .docx, .pptx)
         if in_ext == '.md':
-            for t_ext in ['.pdf', '.docx']:
+            for t_ext in ['.pdf', '.docx', '.pptx']:
                 out = Path(self.output_dir) / f"{input_path.stem}{t_ext}"
                 self.converter.convert(str(input_path), str(out))
-        # Para outros formatos, gera o Markdown
+        # Para outros formatos, gera a versão de trabalho em Markdown
         else:
             out = Path(self.output_dir) / f"{input_path.stem}.md"
             self.converter.convert(str(input_path), str(out))
@@ -133,7 +132,6 @@ def start_watchdog(path_to_watch, output_dir):
     converter = DocumentConverter()
     event_handler = ConversionHandler(converter, output_dir)
 
-    # Varredura Inicial: processa o que já está na pasta ao ligar
     print(f"🔍 Varredura inicial em {path_to_watch}...")
     for file in os.listdir(path_to_watch):
         full_path = os.path.join(path_to_watch, file)
@@ -143,7 +141,7 @@ def start_watchdog(path_to_watch, output_dir):
     observer = Observer()
     observer.schedule(event_handler, path_to_watch, recursive=False)
     observer.start()
-    print(f"👀 Aguardando novos arquivos em: {path_to_watch} (Ctrl+C para parar)")
+    print(f"👀 Aguardando novos arquivos em: {path_to_watch}")
     try:
         while True: time.sleep(1)
     except KeyboardInterrupt:
@@ -152,7 +150,7 @@ def start_watchdog(path_to_watch, output_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Conversor Universal de Documentos v3.0")
+    parser = argparse.ArgumentParser(description="Conversor Universal Automático v4.0")
     parser.add_argument("-i", "--input", help="Arquivo ou pasta de entrada")
     parser.add_argument("-o", "--output", help="Arquivo ou pasta de saída")
     parser.add_argument("--watch", action="store_true", help="Ativar modo Watchdog")
@@ -160,7 +158,7 @@ def main():
 
     if args.watch:
         if not args.input or not args.output:
-            print("❌ Erro: No modo --watch, informe as pastas para --input e --output.")
+            print("❌ Erro: No modo --watch, informe as pastas de entrada e saída.")
             sys.exit(1)
         start_watchdog(args.input, args.output)
     elif args.input and args.output:

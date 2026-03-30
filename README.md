@@ -10,6 +10,8 @@ Sistema robusto de conversão de documentos e planilhas com suporte a monitorame
     * [cite_start]**Planilhas**: XLSX, XLS, CSV, ODS -> Tabelas Markdown[cite: 3].
     * **Exportação**: Arquivos `.md` na entrada geram automaticamente versões em **PDF** e **DOCX** na saída.
 * [cite_start]**Extração de Mídia Inteligente**: Fotos e gráficos são extraídos para uma subpasta `media` dentro do diretório de saída, garantindo links relativos funcionais no Markdown[cite: 4, 15].
+* **PowerPoint para Markdown**: Suporte total para `.ppt` e `.pptx`.
+* **Exportação Multiformato**: Arquivos `.md` na entrada geram automaticamente versões em `.pdf`, `.docx` e `.pptx`.
 
 ---
 
